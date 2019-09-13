@@ -1,0 +1,39 @@
+
+CHIẾN LƯỢC PHIÊN BẢN 11 :
+
+- Cần sửa đổi mô hình :
++ Tăng kích thước mô hình để sinh ra được ảnh có kích thước : 128x128
++ Thực hiện train trên từng đối tượng : 1 đối tượng - 5 views - 6 actions
+==> Nghĩa là phải train khoảng 10 lần cho 5 đối tượng
++ Sửa kích thước ảnh : 128x128 tại pha cắt ảnh, nối ảnh (tiền xử lý), sửa trong 3 models
+??? Anh Cương tiền xử lý từ ảnh 171x128 ==> 112x112 ở bước này (trong quá trình chạy code hay trước khi chay code), ??? Tại sao không tạo luôn ảnh 112x112 mà phải có ảnh 171x128 rồi mới xử lý thành 112x112 ??
+
++ ??? Vấn đề số lượng frames ảnh :
+==> Hiện tại mô hình GAN đang cố định số lượng frame = 16 (nếu sinh ra nhiều hơn thì những frames sau nó không chuẩn nữa ==> đã thử) ==> ??? Trong trường hợp yêu cầu 25 frames thì có thể sử dụng : 16 frames đầu rồi lại thêm tiếp 9 frames đầu tiên của chính (16 frames đầu được không) ???? (Do pha phân loại không nhất thiết phải cần tới chu trình đóng)
++ ??? Lý do tại sao : Lại cần số lượng frames khác nhau ở các kiểu action vậy ??? (Có phải do động tác có thể đang thực hiện dài ngắn khác nhau ???, động tác khó dễ khác nhau) ???
++ ??? Điểm yếu thực sự của mô hình ??? (để cần có thêm dữ liệu giúp cải thiện ???)
++ Số lượng mẫu sinh : khoảng 6-7 mẫu cho (1 đối tượng, view, gesture)
+
+
+
+
+
+""" - CHIẾN LƯỢC CỦA PHIÊN BẢN 10
+- Các chiến lược cần thay đổi : 
++ Thêm vector view cho phía trước Generator (z_view có 5 chiều, one_hot, tương ứng với 5 góc nhìn khác nhau)
++ Đảo vector z_motion xuống phía trước của RNN (vì theo paper thì cách này cho kết quả tốt hơn cả)
++ Hiệu chỉnh các hàm dựng model + các hàm tính lỗi (có thêm lỗi về view) ==> ....
++ Hiện tại cứ tách mỗi video thành đúng 16 frames
++ Về dữ liệu : Sử dụng 7 đối tượng đầu tiên trong dataset ==> Xét trên toàn bộ 12 động tác và 5 view (góc nhìn)
++ Viết thêm hàm nhận đường dẫn tới thư mục gốc ==> sau đó tách từng video thành chính xác 16 frames 64x64 nối dài
++ Tìm hiểu kỹ các độ đo trong paper + Tìm trên mạng về cách đánh giá một mạng GAN như thế nào là tốt (có dựa trên loss, hay validation hay không?) (và sau này sẽ test như thế nào)
++ Viết hàm saveVideos ==> Để save nhiều video cũng một lúc, save nhiều frame cùng một lúc
+
+==> Cần phải check lại dataset sau khi được tải về ==> Xem các thư mục đã được chị Giang gán đúng tên động tác và tên view hay chưa ??? (đã có một vài thư mục bị gán sai đó) ==> Cẩn thận trong bước kiểm tra về dữ liệu !!!!
+
+==> KẾT QUẢ :
++ Mô hình "chưa đủ mạnh" để train được trên quá nhiều đối tượng, quá nhiều views, actions
+==> Thử nghiệm trên chỉ 1 đối tượng (Giang), 5 views, 4 actions ==> Cho kết quả tốt
+==> Sắp tới cần phải tiếp tục sinh ảnh cho các đối tượng khác để có bộ ảnh cho pha phân loại ==> Để xem có làm tăng được hiệu năng lên hay không????
+
+"""
