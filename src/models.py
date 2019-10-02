@@ -316,10 +316,10 @@ class VideoGenerator(nn.Module):
             et_categories = torch.cat([e_t, one_hot_categories], dim=1)
             h_t.append(self.recurrent(et_categories, h_t[-1])) # Output : z_motion : (batchsize, dim_z_motion+dim_z_category)
 
-        # At this time, h_t has dimension of (video_len, batch_size, dim_z_motion)
+        # At this time, h_t has dimension of (video_len, batch_size, dim_z_motion+dim_z_category)
 
         # Design : Needed (batchsize*video_len, dim_z_motion+ self.dim_z_category)
-        # Command 1 : Ouput (video_len, batchsize, 1, dim_z_motion)
+        # Command 1 : Ouput (video_len, batchsize, 1, dim_z_motion+dim_z_category)
         # Command 2 : torch.cat(z_m_t[1:], dim=1) ==> (batchsize, video_len, dim_z_motion+ dim_z_category)
         # Command 2, After that : .view(-1, self.dim_z_motion+dim_z_category) ==> (batchsize*video_len, dim_z_motion+dim_z_category)
         z_m_t = [h_k.view(-1, 1, self.dim_z_motion + self.dim_z_category) for h_k in h_t]
