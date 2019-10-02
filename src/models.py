@@ -35,6 +35,7 @@ class Noise(nn.Module):
 
 # Network of Image Discriminator ==> Conv2d (for image) ==> Output : (batchsize, channel=1, height=1, width=1)
 # n_channels : number of channels (RGB) in original image (input)
+# dim_z_view: number of viewpoints to be distinguished on image discriminator
 # ndf : number unit used in number of channels (filters)
 # use_noise : Boolean to indicate whether adds noise to input
 # noise_sigma : Standard Variance of noise added to input
@@ -69,7 +70,7 @@ class ImageDiscriminator(nn.Module):
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(ndf * 8, 1 + dim_z_view, 4, 1, 0, bias=False), # output : (batchsize, channel=1, height=1, width=1)
+            nn.Conv2d(ndf * 8, 1 + dim_z_view, 4, 1, 0, bias=False), # output : (batchsize, channel=1+dim_z_view, height=1, width=1)
         )
 
     def split(self, input):
@@ -77,6 +78,7 @@ class ImageDiscriminator(nn.Module):
 
     # To run this network
     def forward(self, input):
+	# (batchsize, channel=1+dim_z_view, height=1, width=1) ==> (batchsize, channel=1+dim_z_view)
         h = self.main(input).squeeze() # tensor.squeeze() or torch.squeeze(tensor) ==> return tensor with dimension of size one eleminated
         labels, views = self.split(h)
         return labels, views, None
@@ -84,7 +86,7 @@ class ImageDiscriminator(nn.Module):
 
 
 
-# Similar with ImageDiscrinator, but only have 4 conv2d to return output of size (batchsize, channel=1, height=4, width=4)
+# Similar to ImageDiscrinator, but only have 4 conv2d to return output of size (batchsize, channel=1, height=4, width=4)
 class PatchImageDiscriminator(nn.Module):
     def __init__(self, n_channels, dim_z_view, ndf=64, use_noise=False, noise_sigma=None):
         super(PatchImageDiscriminator, self).__init__()
@@ -166,7 +168,6 @@ class PatchImageDiscriminator(nn.Module):
 class VideoDiscriminator(nn.Module):
     def __init__(self, n_channels, n_output_neurons=1, bn_use_gamma=True, use_noise=False, noise_sigma=None, ndf=64):
         super(VideoDiscriminator, self).__init__()
-
         self.n_channels = n_channels
         self.n_output_neurons = n_output_neurons
         self.use_noise = use_noise
@@ -205,13 +206,14 @@ class VideoDiscriminator(nn.Module):
 
     # To run this network
     def forward(self, input):
+	# (batchsize, channel=n_output_neurons=1, depth=1, height=1, width=1) ==> (batchsize, channel=n_output_neurons=1)
         h = self.main(input).squeeze()
         return h, None
 
 
-# Network of CategoricalVideoDiscriminator : Input (batchsize, channel=3, depth=16, height=64, width=64) ==> Output (batchsize, channel=n_output_neurons + dim_categorical=1+6=7, depth=1, height=1, width=1)
+# Network of CategoricalVideoDiscriminator : Input (batchsize, channel=3, depth=16, height=64, width=64) ==> Output (batchsize, channel=n_output_neurons + dim_z_view + dim_categorical=1+5+6=12, depth=1, height=1, width=1)
 # Install category prediction in the network
-# Return vector with size = n_output_neurons + dim_categorical = 1 + 6 = 7 (for real/fake label and category label)
+# Return vector with size = n_output_neurons + dim_z_view + dim_categorical = 1 + 5 + 6 = 7 (for real/fake label, view label and category label)
 class CategoricalVideoDiscriminator(VideoDiscriminator):
     def __init__(self, n_channels, dim_z_view, dim_z_category, n_output_neurons=1, use_noise=False, noise_sigma=None):
         super(CategoricalVideoDiscriminator, self).__init__(n_channels=n_channels,
@@ -222,8 +224,8 @@ class CategoricalVideoDiscriminator(VideoDiscriminator):
         self.dim_z_category = dim_z_category
         self.dim_z_view = dim_z_view
 
-    # input : (batchsize, channel= n_output_neurons + dim_categorical = 1 + 6 = 7)
-    # Split input into : (batchsize, 1) and (batchsize, 6)
+    # input : (batchsize, channel= n_output_neurons + dim_z_view + dim_categorical = 1 + 5 + 6 = 12)
+    # Split input into : (batchsize, 1) and (batchsize, 5) and (batchsize, 6)
     def split(self, input):
         return input[:, : 1], input[:, 1 : 1 + self.dim_z_view], input[:, 1 + self.dim_z_view : input.size(1)]
 
@@ -235,25 +237,24 @@ class CategoricalVideoDiscriminator(VideoDiscriminator):
 
 
 # Network to generate a video (set of many frames of a video)
-# Input (batchsize*video_length, channel= (dim_z_motion + dim_z_category + dim_z_content), height=1, width=1)
+# Input (batchsize*video_length, channel= (dim_z_content + dim_z_view + dim_z_motion + dim_z_category), height=1, width=1)
 # Output (batchsize*video_length, channels=3, height=128, width=128)
 class VideoGenerator(nn.Module):
     def __init__(self, n_channels, dim_z_content, dim_z_view, dim_z_motion, dim_z_category,
                  video_length, ngf=64):
         super(VideoGenerator, self).__init__()
-
         self.n_channels = n_channels
         self.dim_z_content = dim_z_content
         self.dim_z_view = dim_z_view
         self.dim_z_category = dim_z_category
         self.dim_z_motion = dim_z_motion
         self.video_length = video_length
-
         dim_z = dim_z_content + dim_z_view + dim_z_motion + dim_z_category
-
+	
+	# GRU Network
         self.recurrent = nn.GRUCell(dim_z_motion+ dim_z_category, dim_z_motion+ dim_z_category)
 
-        # Input (batchsize*video_length, channel= (dim_z_motion + dim_z_category + dim_z_content), height=1, width=1)
+        # Input (batchsize*video_length, channel= (dim_z_content + dim_z_view + dim_z_motion + dim_z_category), height=1, width=1)
         self.main = nn.Sequential(
             nn.ConvTranspose2d(dim_z, ngf * 8, 4, 1, 0, bias=False), # Output (batchsize*video_length, channels=64*8, height=4, width=4)
             nn.BatchNorm2d(ngf * 8),
@@ -282,11 +283,10 @@ class VideoGenerator(nn.Module):
 
     # Generate batchsize of z_motion : (batchsize*video_len, dim_z_motion)
     # num_samples : batch_size
-    # video_len : length of generated videos (video_len must be fixed in model)
+    # video_len : number of frames in each video (video_len must be fixed in model = 16 frames/video)
     def sample_z_motion_category(self, num_samples, video_len=None):
         # Get fixed length of generated videos (default=video_length in configuration)
         video_len = video_len if video_len is not None else self.video_length
-
 
         # Generate a vector of size num_samples (batchsize), domain : 0-->(dim_z_category-1)
         # Each element represents a category label of an instance in batchsize
@@ -314,7 +314,7 @@ class VideoGenerator(nn.Module):
         for frame_num in range(video_len):
             e_t = self.get_iteration_noise(num_samples) # Generate random e_t : Variable(batchsize, dim_z_motion)
             et_categories = torch.cat([e_t, one_hot_categories], dim=1)
-            h_t.append(self.recurrent(et_categories, h_t[-1])) # Output : z_motion : (batchsize, dim_z_motion)
+            h_t.append(self.recurrent(et_categories, h_t[-1])) # Output : z_motion : (batchsize, dim_z_motion+dim_z_category)
 
         # At this time, h_t has dimension of (video_len, batch_size, dim_z_motion)
 
