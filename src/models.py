@@ -325,12 +325,13 @@ class VideoGenerator(nn.Module):
         z_m_t = [h_k.view(-1, 1, self.dim_z_motion + self.dim_z_category) for h_k in h_t]
         z_m = torch.cat(z_m_t[1:], dim=1).view(-1, self.dim_z_motion + self.dim_z_category)
 
-        # (batchsize*video_len, dim_z_motion+dim_z_category)
+        # z_m: (batchsize*video_len, dim_z_motion+dim_z_category)
+	# classes_to_generate: (batchsize, )
         return z_m, classes_to_generate
 
 
-    # Generate batchsize of categories : (batchsize, dim_z_category)
-    # Category of frames in same videos is the same
+    # Generate batchsize of views : vector of shape (batchsize, )
+    # Viewpoint of frames in one video is the same
     # num_samples : batchsize
     # video_len : fixed total frames of generated videos
     def sample_z_view(self, num_samples, video_len):
@@ -340,7 +341,7 @@ class VideoGenerator(nn.Module):
         # if self.dim_z_view <= 0:
         #     return None, np.zeros(num_samples)
 
-        # Generate a vector of size num_samples (batchsize), domain : 0-->(dim_z_category-1)
+        # Generate a vector of size num_samples (batchsize), domain : 0-->(dim_z_view-1)
         # Each element represents a category label of an instance in batchsize
         classes_to_generate = np.random.randint(self.dim_z_view, size=num_samples)
 
@@ -363,9 +364,6 @@ class VideoGenerator(nn.Module):
         # Variable(one_hot_video) : (batch_size*video_len, dim_z_category)
         # classes_to_generate : vector of (batch_size), each element is a scalar to indicate the category index of each instance in batchsize
         return Variable(one_hot_video), classes_to_generate
-
-
-
 
 
     # Generate batchsize of contents : (batchsize, dim_z_content)
@@ -391,9 +389,6 @@ class VideoGenerator(nn.Module):
 
         # (num_samples*video_len, self.dim_z_content)
         return Variable(content)
-
-
-
 
 
     # Generate complete z : concatenate all of these z_content, z_category, z_motion
@@ -430,7 +425,7 @@ class VideoGenerator(nn.Module):
         # Ouput h of Generator : (batchsize*video_len, channels=3, height=64, width=64)
         h = self.main(z.view(z.size(0), z.size(1), 1, 1))
 
-        # Transpose h to dimension : (batchsize, video_len, channel=3, height=64, width=64)
+        # Transpose h to dimension : (batchsize, video_len, channel=3, height=128, width=128)
         h = h.view(h.size(0) / video_len, video_len, self.n_channels, h.size(3), h.size(3))
 
         # Convert numpy to tensor of torch
@@ -476,7 +471,7 @@ class VideoGenerator(nn.Module):
         # Transpose z to (num_samples, channels=dim_z, height=1, width=1)
         z = z.view(z.size(0), z.size(1), 1, 1)
         # Take in z as a input of network Generator
-        # Output : (num_samples, channels=3, height=64, width=64)
+        # Output : (num_samples, channels=3, height=128, width=128)
         h = self.main(z)
 
         # Convert numpy to tensor of torch
@@ -486,11 +481,11 @@ class VideoGenerator(nn.Module):
         if torch.cuda.is_available():
             z_view_labels = z_view_labels.cuda()
 
-        # Return h : (num_samples, channels=3, height=64, width=64)
+        # Return h : (num_samples, channels=3, height=128, width=128)
         # None : means images don't aware about action category of image (only videos can do this)
         return h, Variable(z_view_labels, requires_grad=False), None
 
-    # Initialize batchsize of hidden states h[0]s : (batchsize, dim_z_motion)
+    # Initialize batchsize of hidden states h[0]s : (batchsize, dim_z_motion+dim_z_category)
     # with values drawn from normal distribution of mean=0, std=1
     def get_gru_initial_state(self, num_samples):
         return Variable(T.FloatTensor(num_samples, self.dim_z_motion + self.dim_z_category).normal_())
