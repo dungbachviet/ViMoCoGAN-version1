@@ -50,40 +50,35 @@ import os
 import docopt
 import PIL
 from PIL import Image
-
 import functools
-
 import torch
 torch.backends.cudnn.enabled = False
 from torch.utils.data import DataLoader
 from torchvision import transforms
-
 import models
 # from src import models
-
 from trainers import Trainer
 # from src.trainers import Trainer
-
 import data
 # from src import data
 
-# Creat an object of network discriminator (expected)
+# Create an object of network discriminator (expected)
 # **kwargs : syntax to allow taking in many parameters of formats : key1=value, key2=value,...
 # Inside the funtions, kwargs mean dictionary, *kwargs means set of keyword, **kwars means format of parameters
 # type : string of type of discriminator object to create
 def build_discriminator(type, **kwargs):
-    discriminator_type = getattr(models, type) # Get Class (its name is of 'type') in module models (models.py)
+    discriminator_type = getattr(models, type) # Get class (that its name is of 'type') in module models (models.py)
 
     # # Check the correctness of parameters taken in
     # if 'Categorical' not in type and 'dim_categorical' in kwargs:
-    #     kwargs.pop('dim_categorical') # ??? ?ây hình nh? là thao tác xóa
+    #     kwargs.pop('dim_categorical') # ??? ?Ã¢y hÃ¬nh nh? lÃ  thao tÃ¡c xÃ³a
 
     return discriminator_type(**kwargs)# an object of Discriminator class expected
 
 
 # Transform video (frames in one video)
 def video_transform(video, image_transform):
-    vid = [] # List containing tensor of image
+    vid = [] # List containing tensors of images
 
     # each im (one frame) in video has dimension of (height, width, channel)
     # image_transform(im) ==> ouput : (channel, height, width) (normalized into -1 --> 1)
@@ -95,7 +90,6 @@ def video_transform(video, image_transform):
     # torch.stack(vid) (default dim=0) ==> (video_len, channel, height, width)
     # Continually, .permute(1, 0, 2, 3) ==> (channel, depth=video_len, height, width)
     vid = torch.stack(vid).permute(1, 0, 2, 3)
-
     return vid
 
 
@@ -104,7 +98,6 @@ args = docopt.docopt(__doc__)
 if __name__ == "__main__":
     # args = docopt.docopt(__doc__) # __doc__ is the first above comment of this file
     print(args) # Display the parameters configuration
-
     n_channels = int(args['--n_channels']) # Get number of channels of original images/videos
 
     # Set up a transform to images
